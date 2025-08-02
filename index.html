@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DarkTradeX | Mobile Trade Chart</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:#0e0e1a; color:#00ffe7; font-family:'Orbitron',sans-serif; }
+    .bal { text-align:center; padding:12px; font-size:18px; }
+    .chart { width:100%; max-width:480px; margin:auto; border:1px solid #222; border-radius:8px; background:#0c0e16; height:300px; }
+    .controls, .btns, .foot { max-width:480px; margin:15px auto; display:flex; flex-wrap:wrap; gap:8px; justify-content:center;}
+    select,input { padding:10px; font-size:16px; border:none; border-radius:6px; background:#121625; color:#00ffe7; }
+    .btn { flex:1 1 45%; padding:14px; font-size:18px; color:#000; font-weight:900; border:none; border-radius:10px; cursor:pointer; }
+    .call { background:linear-gradient(90deg,#00ff9a,#00ffe7); }
+    .put { background:linear-gradient(90deg,#ff5656,#ff1a1a); }
+    .foot button { flex:1 1 48%; padding:10px; background:#202030; color:#00ffe7; font-size:16px; border:none; border-radius:8px; }
+  </style>
+</head>
+<body>
+
+<div class="bal">Balance: $<span id="balance">10000.00</span></div>
+
+<div class="chart" id="chart"></div>
+
+<div class="controls">
+  <select id="currency"><option>EUR</option><option>BTC</option><option>ETH</option></select>
+  <select id="duration"><option value="5">5 sec</option><option value="30">30 sec</option><option value="60">1 min</option></select>
+  <input type="number" id="amount" placeholder="Amount" value="100">
+</div>
+
+<div class="btns">
+  <button class="btn call" onclick="placeTrade('call')">CALL</button>
+  <button class="btn put" onclick="placeTrade('put')">PUT</button>
+</div>
+
+<div class="foot">
+  <button onclick="deposit()">Deposit</button>
+  <button onclick="withdraw()">Withdraw</button>
+</div>
+
+<script src="https://unpkg.com/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+  let balance=10000;
+  const balEl=document.getElementById('balance');
+  function updateBal(){ balEl.textContent=balance.toFixed(2); }
+  updateBal();
+
+  const chart=LightweightCharts.createChart(document.getElementById('chart'),{
+    width: document.getElementById('chart').clientWidth, height:300,
+    layout:{background:'#0c0e16', textColor:'#00ffe7'},
+    grid:{vertLines:{color:'#222'}, horzLines:{color:'#222'}},
+    localization:{priceFormatter: p=>p.toFixed(2)}
+  });
+  const series=chart.addCandlestickSeries({
+    upColor:'#00ff9a', downColor:'#ff5656', borderVisible:false, wickUpColor:'#00ff9a', wickDownColor:'#ff5656'
+  });
+
+  let data=[], lastTime=Math.floor(Date.now()/1000)-60*60, lastClose=100;
+  function genCandle(){
+    const open=lastClose;
+    const close=open+(Math.random()-0.5)*2;
+    const high=Math.max(open,close)+Math.random()*0.5;
+    const low=Math.min(open,close)-Math.random()*0.5;
+    lastTime+=5;
+    lastClose=close;
+    return {time:lastTime, open, high, low, close};
+  }
+  for(let i=0;i<120;i++) data.push(genCandle());
+  series.setData(data);
+  series.applyOptions({ priceFormat:{ type:'price', precision:2 } });
+
+  setInterval(()=>{
+    data.shift(); data.push(genCandle());
+    series.setData(data);
+  },5000);
+  window.addEventListener('resize', ()=> chart.applyOptions({ width:document.getElementById('chart').clientWidth }));
+
+  function placeTrade(type){
+    const amt=parseFloat(document.getElementById('amount').value);
+    const dur=parseInt(document.getElementById('duration').value);
+    if(isNaN(amt)||amt<=0||amt>balance){ alert('Invalid amount'); return;}
+    balance-=amt; updateBal();
+    const entry = data[data.length-1];
+    // add marker at entry candle
+    series.setMarkers([{
+      time: entry.time,
+      position: 'aboveBar',
+      color: type==='call'?'#00ff9a':'#ff5656',
+      shape: type==='call'?'arrowUp':'arrowDown',
+      text: type.toUpperCase()
+    }]);
+    setTimeout(()=>{
+      const win = Math.random() < 0.85;
+      if(win) balance += amt*1.85;
+      updateBal();
+      alert(win? `${type.toUpperCase()} WON!`:`${type.toUpperCase()} LOST`);
+      series.setMarkers([]); // clear marker
+    }, dur*1000);
+  }
+
+  function deposit(){
+    const v=prompt('Enter deposit amount:'); const n=parseFloat(v);
+    if(n>0){ balance+=n; updateBal(); alert('Deposited '+n); }
+  }
+  function withdraw(){
+    const v=prompt('Enter withdrawal amount:'); const n=parseFloat(v);
+    if(n>0 && n<=balance){ balance-=n; updateBal(); alert('Withdrew '+n); }
+    else alert('Invalid/Insufficient');
+  }
+</script>
+
+</body>
+</html>
